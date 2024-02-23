@@ -1,20 +1,25 @@
 "use client"
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import UploadForm from './_components/UploadForm'
 import { app } from '@/firebaseConfig'
 import { getStorage, ref ,uploadBytesResumable,getDownloadURL} from "firebase/storage";
-import { getFirestore } from "firebase/firestore";
+import { doc, getFirestore, setDoc } from "firebase/firestore";
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { useUser } from '@clerk/nextjs';
 import { generateRandomString } from '@/app/_utils/GenerateRandomString';
+import { useRouter } from 'next/navigation';
 
 
 
 
 const Upload = () => {
+  const [docID,setFileInfoDoc] = useState(generateRandomString())
+  // const [ use1 ,setUse1] = useState(0)
+  const router = useRouter()
   const {user} = useUser();
   const [progress, setprogress] = useState()
+  const [uploadCompleted,setUploadCompleted] = useState(false);
   const storage = getStorage(app)
   const db = getFirestore(app);
   // const storageRef = ref(storage);
@@ -29,7 +34,6 @@ const Upload = () => {
   (snapshot) => {
     // Get task progress, including the number of bytes uploaded and the total number of bytes to be uploaded
     const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-   
     setprogress(progress)
     if(progress == 100){
       toast.success('Successfully Uploaded', {
@@ -42,28 +46,45 @@ const Upload = () => {
         progress: undefined,
         theme: "light",
         });
-    }
+        setUploadCompleted(true)
+      }
     progress == 100 && getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
       console.log('File available at', downloadURL);
+      saveInfo(SaveFiles,downloadURL)
     });
   }, )
 
   }
 
+  
+ 
+
   const saveInfo = async(file,fileURL)=>{
-    const docId = Date.now().toString();
+    // const docID = generateRandomString();
+    // setUse1(1);
     // Add a new document in collection "cities"
-    await setDoc(doc(db, "uploadedFiles", docId), {
-      fileName:file.Name,
-      fileSize:file.size,
-      fileType:file.type,
+    await setDoc(doc(db, "uploadedFiles", docID), {
+      fileName:file?.name,
+      fileSize:file?.size,
+      fileType:file?.type,
       fileUrl:fileURL,
-      userEmail:user.primaryEmailAddress.emailAddress,
-      userName:user.fullName,
+      userEmail:user?.primaryEmailAddress.emailAddress,
+      userName:user?.fullName,
       password:'',
-      shortUrl:process.env.NEXT_PUBLIC_BASE_URL + generateRandomString()
-});
+      Id:docID,
+      shortUrl:process.env.NEXT_PUBLIC_BASE_URL + docID
+    })
   }
+
+  useEffect(()=>{
+    uploadCompleted&&
+    setTimeout(()=>{
+      setUploadCompleted(false)
+      console.log(docID)
+      router.push(('/file-preview/'+docID))
+    },2000)
+  },[uploadCompleted==true])
+  
 
   return (
     <>
